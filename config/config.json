@@ -1,0 +1,17 @@
+{
+  "database": {
+    "host": "localhost",
+    "username": "root",
+    "password": "",
+    "name": "uek295"
+  },
+  "jwt": {
+    "secret": "sec!ReT423*&",
+    "issuer": "admin",
+    "lifetime": 3600
+  },
+  "auth": {
+    "username": "admin",
+    "password": "sec!ReT423*&"
+  }
+}
