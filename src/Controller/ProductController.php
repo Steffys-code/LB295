@@ -1,16 +1,258 @@
 <?php
 
+use OpenApi\Attributes as OAT;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 require_once __DIR__ . '/../database.php';
 require_once __DIR__ . '/../validation.php';
 
+#[OAT\Schema(
+    schema: 'Product',
+    type: 'object',
+    required: [
+        'product_id',
+        'sku',
+        'active',
+        'id_category',
+        'name',
+        'image',
+        'description',
+        'price',
+        'stock'
+    ],
+    properties: [
+        new OAT\Property(
+            property: 'product_id',
+            type: 'integer',
+            minimum: 1,
+            example: 1
+        ),
+        new OAT\Property(
+            property: 'sku',
+            type: 'string',
+            example: 'TEST-001'
+        ),
+        new OAT\Property(
+            property: 'active',
+            type: 'integer',
+            enum: [0, 1],
+            example: 1
+        ),
+        new OAT\Property(
+            property: 'id_category',
+            type: 'integer',
+            nullable: true,
+            description: 'Kategorie-ID oder null, wenn keine Kategorie zugeordnet ist.',
+            example: 1
+        ),
+        new OAT\Property(
+            property: 'name',
+            type: 'string',
+            example: 'Testprodukt'
+        ),
+        new OAT\Property(
+            property: 'image',
+            type: 'string',
+            example: ''
+        ),
+        new OAT\Property(
+            property: 'description',
+            type: 'string',
+            example: 'Ein Produkt zum Testen der API.'
+        ),
+        new OAT\Property(
+            property: 'price',
+            type: 'string',
+            description: 'Der Preis wird als String zurückgegeben.',
+            example: '19.90'
+        ),
+        new OAT\Property(
+            property: 'stock',
+            type: 'integer',
+            minimum: 0,
+            maximum: 2147483647,
+            example: 10
+        )
+    ]
+)]
+#[OAT\Schema(
+    schema: 'ProductFields',
+    type: 'object',
+    required: [
+        'active',
+        'id_category',
+        'name',
+        'image',
+        'description',
+        'price',
+        'stock'
+    ],
+    properties: [
+        new OAT\Property(
+            property: 'active',
+            type: 'integer',
+            enum: [0, 1],
+            description: '0 = inaktiv, 1 = aktiv',
+            example: 1
+        ),
+        new OAT\Property(
+            property: 'id_category',
+            description: 'Positive Kategorie-ID oder null. '
+                . 'Eine angegebene Kategorie muss existieren. '
+                . 'Die API akzeptiert auch eine gültige ID als String.',
+            oneOf: [
+                new OAT\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 2147483647,
+                    nullable: true
+                ),
+                new OAT\Schema(
+                    type: 'string',
+                    minLength: 1
+                )
+            ],
+            example: null
+        ),
+        new OAT\Property(
+            property: 'name',
+            type: 'string',
+            minLength: 1,
+            maxLength: 500,
+            description: 'Darf nicht nur aus Leerzeichen bestehen.',
+            example: 'Testprodukt'
+        ),
+        new OAT\Property(
+            property: 'image',
+            type: 'string',
+            maxLength: 1000,
+            description: 'Bildangabe als Text. Ein leerer String ist erlaubt.',
+            example: ''
+        ),
+        new OAT\Property(
+            property: 'description',
+            type: 'string',
+            description: 'Beschreibung mit maximal 65535 Bytes. '
+                . 'Ein leerer String ist erlaubt.',
+            example: 'Ein Produkt zum Testen der API.'
+        ),
+               new OAT\Property(
+            property: 'price',
+            description: 'Nicht negativer Preis mit maximal zwei Nachkommastellen '
+                . 'und maximal 63 Ziffern vor dem Dezimalpunkt. '
+                . 'Als String oder Zahl übermittelbar; ein String wird empfohlen.',
+            oneOf: [
+                new OAT\Schema(
+                    type: 'string',
+                    pattern: '^[0-9]{1,63}(?:\.[0-9]{1,2})?$'
+                ),
+                new OAT\Schema(
+                    type: 'number',
+                    minimum: 0
+                )
+            ],
+            example: '19.90'
+        ),
+        new OAT\Property(
+            property: 'stock',
+            type: 'integer',
+            minimum: 0,
+            maximum: 2147483647,
+            example: 10
+        )
+    ]
+)]
+#[OAT\Schema(
+    schema: 'ProductCreateInput',
+    allOf: [
+        new OAT\Schema(
+            ref: '#/components/schemas/ProductFields'
+        ),
+        new OAT\Schema(
+            type: 'object',
+            required: ['sku'],
+            properties: [
+                new OAT\Property(
+                    property: 'sku',
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: 100,
+                    description: 'Artikelnummer. Darf nicht nur aus Leerzeichen bestehen.',
+                    example: 'TEST-001'
+                )
+            ]
+        )
+    ],
+    example: [
+        'sku' => 'TEST-001',
+        'active' => 1,
+        'id_category' => null,
+        'name' => 'Testprodukt',
+        'image' => '',
+        'description' => 'Ein Produkt zum Testen der API.',
+        'price' => '19.90',
+        'stock' => 10
+    ]
+)]
+#[OAT\Schema(
+    schema: 'ProductError',
+    type: 'object',
+    required: ['error'],
+    properties: [
+        new OAT\Property(
+            property: 'error',
+            type: 'string',
+            example: 'Product not found.'
+        )
+    ]
+)]
+#[OAT\Schema(
+    schema: 'ProductValidationErrors',
+    type: 'object',
+    required: ['errors'],
+    properties: [
+        new OAT\Property(
+            property: 'errors',
+            type: 'array',
+            items: new OAT\Items(type: 'string'),
+            example: ['Active must be the integer 0 or 1.']
+        )
+    ]
+)]
 class ProductController
 {
     /**
      * Return all products.
      */
+    #[OAT\Get(
+        path: '/api/v1/products',
+        operationId: 'listProducts',
+        tags: ['Produkte'],
+        summary: 'Alle Produkte abrufen',
+        description: 'Gibt alle Produkte nach ihrer internen ID sortiert zurück.',
+        security: [['cookieAuth' => []]],
+        responses: [
+            new OAT\Response(
+                response: 200,
+                description: 'Liste der Produkte. Kann leer sein.',
+                content: new OAT\JsonContent(
+                    type: 'array',
+                    items: new OAT\Items(
+                        ref: '#/components/schemas/Product'
+                    )
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            )
+        ]
+    )]
     public function listProducts(
         ServerRequestInterface $request,
         ResponseInterface $response
@@ -39,6 +281,61 @@ class ProductController
     /**
      * Return one product.
      */
+    #[OAT\Get(
+        path: '/api/v1/product/{product_id}',
+        operationId: 'getProduct',
+        tags: ['Produkte'],
+        summary: 'Ein Produkt über seine ID abrufen',
+        security: [['cookieAuth' => []]],
+        parameters: [
+            new OAT\Parameter(
+                name: 'product_id',
+                in: 'path',
+                required: true,
+                description: 'Interne Produkt-ID, nicht die SKU',
+                schema: new OAT\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 2147483647
+                ),
+                example: 1
+            )
+        ],
+        responses: [
+            new OAT\Response(
+                response: 200,
+                description: 'Produkt gefunden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/Product'
+                )
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Produkt-ID ist ungültig.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError',
+                    example: [
+                        'error' => 'Product ID must be a positive integer.'
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            ),
+            new OAT\Response(
+                response: 404,
+                description: 'Produkt wurde nicht gefunden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError'
+                )
+            )
+        ]
+    )]
     public function getProduct(
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -76,6 +373,54 @@ class ProductController
     /**
      * Create a product.
      */
+    #[OAT\Post(
+        path: '/api/v1/product',
+        operationId: 'createProduct',
+        tags: ['Produkte'],
+        summary: 'Ein Produkt erstellen',
+        description: 'Alle acht bearbeitbaren Felder müssen übermittelt werden. '
+            . 'Unbekannte Felder werden abgelehnt. '
+            . 'Die interne Produkt-ID wird automatisch vergeben.',
+        security: [['cookieAuth' => []]],
+        requestBody: new OAT\RequestBody(
+            required: true,
+            content: new OAT\JsonContent(
+                ref: '#/components/schemas/ProductCreateInput'
+            )
+        ),
+        responses: [
+            new OAT\Response(
+                response: 201,
+                description: 'Produkt wurde erstellt.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/Product'
+                )
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Ungültiger Body, ungültige Felder '
+                    . 'oder nicht vorhandene Kategorie.',
+                content: new OAT\JsonContent(
+                    oneOf: [
+                        new OAT\Schema(
+                            ref: '#/components/schemas/ProductError'
+                        ),
+                        new OAT\Schema(
+                            ref: '#/components/schemas/ProductValidationErrors'
+                        )
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            )
+        ]
+    )]
     public function createProduct(
         ServerRequestInterface $request,
         ResponseInterface $response
@@ -84,94 +429,232 @@ class ProductController
     }
 
     /**
-     * Replace all editable product fields.
+     * Create or update a product using the SKU from the URL.
      */
-    /**
- * Create or update a product using the SKU from the URL.
- */
-public function updateProduct(
-    ServerRequestInterface $request,
-    ResponseInterface $response,
-    array $args
-): ResponseInterface {
-    $sku = $args['sku'] ?? null;
+    #[OAT\Put(
+        path: '/api/v1/product/{sku}',
+        operationId: 'updateProduct',
+        tags: ['Produkte'],
+        summary: 'Ein Produkt über seine SKU erstellen oder aktualisieren',
+        description: 'Existiert die SKU bereits, werden alle bearbeitbaren Felder '
+            . 'des Produkts ersetzt. Andernfalls wird ein neues Produkt erstellt. '
+            . 'Die SKU stammt aus der URL. Eine SKU im Body wird überschrieben. '
+            . 'Alle sieben übrigen Produktfelder müssen im Body enthalten sein. '
+            . 'Unbekannte Felder werden abgelehnt.',
+        security: [['cookieAuth' => []]],
+        parameters: [
+            new OAT\Parameter(
+                name: 'sku',
+                in: 'path',
+                required: true,
+                description: 'Artikelnummer, nicht die interne Produkt-ID. '
+                    . 'Darf nicht nur aus Leerzeichen bestehen.',
+                schema: new OAT\Schema(
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: 100
+                ),
+                example: 'TEST-001'
+            )
+        ],
+        requestBody: new OAT\RequestBody(
+            required: true,
+            content: new OAT\JsonContent(
+                ref: '#/components/schemas/ProductFields',
+                example: [
+                    'active' => 1,
+                    'id_category' => null,
+                    'name' => 'Testprodukt geändert',
+                    'image' => '',
+                    'description' => 'Aktualisierte Beschreibung.',
+                    'price' => '24.90',
+                    'stock' => 15
+                ]
+            )
+        ),
+        responses: [
+            new OAT\Response(
+                response: 200,
+                description: 'Vorhandenes Produkt wurde aktualisiert.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/Product'
+                )
+            ),
+            new OAT\Response(
+                response: 201,
+                description: 'Neues Produkt wurde erstellt.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/Product'
+                )
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Ungültige SKU, ungültiger Body, ungültige Felder '
+                    . 'oder nicht vorhandene Kategorie.',
+                content: new OAT\JsonContent(
+                    oneOf: [
+                        new OAT\Schema(
+                            ref: '#/components/schemas/ProductError'
+                        ),
+                        new OAT\Schema(
+                            ref: '#/components/schemas/ProductValidationErrors'
+                        )
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            ),
+            new OAT\Response(
+                response: 404,
+                description: 'Ein zuvor gefundenes Produkt ist beim Speichern '
+                    . 'nicht mehr vorhanden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError'
+                )
+            )
+        ]
+    )]
+    public function updateProduct(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args
+    ): ResponseInterface {
+        $sku = $args['sku'] ?? null;
 
-    // Validate the SKU without converting it to an integer.
-    if (
-        !is_string($sku)
-        || !isValidText($sku, 100)
-    ) {
-        return $this->jsonResponse(
+        // Validate the SKU without converting it to an integer.
+        if (
+            !is_string($sku)
+            || !isValidText($sku, 100)
+        ) {
+            return $this->jsonResponse(
+                $response,
+                ['error' => 'SKU must contain between 1 and 100 characters.'],
+                400
+            );
+        }
+
+        $data = $request->getParsedBody();
+
+        if (!is_array($data)) {
+            return $this->jsonResponse(
+                $response,
+                ['error' => 'A JSON object is required.'],
+                400
+            );
+        }
+
+        // Use the URL as the authoritative source of the SKU.
+        $data['sku'] = $sku;
+
+        // Validate all product data before querying the database.
+        $errors = $this->validateProduct($data);
+
+        if ($errors !== []) {
+            return $this->jsonResponse(
+                $response,
+                ['errors' => $errors],
+                400
+            );
+        }
+
+        $database = createDatabaseConnection();
+
+        try {
+            // Find the internal ID of the product with this SKU.
+            $statement = $database->prepare(
+                'SELECT product_id
+                 FROM product
+                 WHERE sku = ?'
+            );
+
+            $statement->bind_param('s', $sku);
+            $statement->execute();
+
+            $result = $statement->get_result();
+            $existingProduct = $result->fetch_assoc();
+
+            $result->free();
+            $statement->close();
+
+            $productId = $existingProduct === null
+                ? null
+                : (int) $existingProduct['product_id'];
+        } finally {
+            $database->close();
+        }
+
+        // Pass the SKU to the existing validation and save logic.
+        $request = $request->withParsedBody($data);
+
+        // A null ID creates a product; an existing ID updates it.
+        return $this->saveProduct(
+            $request,
             $response,
-            ['error' => 'SKU must contain between 1 and 100 characters.'],
-            400
+            $productId
         );
     }
-
-    $data = $request->getParsedBody();
-
-    if (!is_array($data)) {
-        return $this->jsonResponse(
-            $response,
-            ['error' => 'A JSON object is required.'],
-            400
-        );
-    }
-
-    // Use the URL as the authoritative source of the SKU.
-    $data['sku'] = $sku;
-
-    // Validate all product data before querying the database.
-    $errors = $this->validateProduct($data);
-
-    if ($errors !== []) {
-        return $this->jsonResponse(
-            $response,
-            ['errors' => $errors],
-            400
-        );
-    }
-
-    $database = createDatabaseConnection();
-
-    try {
-        // Find the internal ID of the product with this SKU.
-        $statement = $database->prepare(
-            'SELECT product_id
-             FROM product
-             WHERE sku = ?'
-        );
-
-        $statement->bind_param('s', $sku);
-        $statement->execute();
-
-        $result = $statement->get_result();
-        $existingProduct = $result->fetch_assoc();
-
-        $result->free();
-        $statement->close();
-
-        $productId = $existingProduct === null
-            ? null
-            : (int) $existingProduct['product_id'];
-    } finally {
-        $database->close();
-    }
-
-    // Pass the SKU to the existing validation and save logic.
-    $request = $request->withParsedBody($data);
-
-    // A null ID creates a product; an existing ID updates it.
-    return $this->saveProduct(
-        $request,
-        $response,
-        $productId
-    );
-}
 
     /**
      * Delete a product.
      */
+    #[OAT\Delete(
+        path: '/api/v1/product/{product_id}',
+        operationId: 'deleteProduct',
+        tags: ['Produkte'],
+        summary: 'Ein Produkt über seine ID löschen',
+        security: [['cookieAuth' => []]],
+        parameters: [
+            new OAT\Parameter(
+                name: 'product_id',
+                in: 'path',
+                required: true,
+                description: 'Interne Produkt-ID, nicht die SKU',
+                schema: new OAT\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 2147483647
+                ),
+                example: 1
+            )
+        ],
+        responses: [
+            new OAT\Response(
+                response: 204,
+                description: 'Produkt wurde gelöscht. Kein Response-Body.'
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Produkt-ID ist ungültig.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError',
+                    example: [
+                        'error' => 'Product ID must be a positive integer.'
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            ),
+            new OAT\Response(
+                response: 404,
+                description: 'Produkt wurde nicht gefunden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/ProductError'
+                )
+            )
+        ]
+    )]
     public function deleteProduct(
         ServerRequestInterface $request,
         ResponseInterface $response,

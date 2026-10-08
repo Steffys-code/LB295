@@ -1,13 +1,24 @@
 <?php
-require __DIR__ . "/../vendor/autoload.php";
-// Require all scripts within /api directory.
-$scripts = glob(__DIR__ . "/api/*.php");
-foreach ($scripts as $script) {
-require $script;
-}
-// Build and return OpenAPI documentation as YAML.
+
+// Load installed Composer packages.
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Load all controller classes before reading their OAT attributes.
+require_once __DIR__ . '/../src/Controller/AuthController.php';
+require_once __DIR__ . '/../src/Controller/CategoryController.php';
+require_once __DIR__ . '/../src/Controller/ProductController.php';
+
+// Build the documentation from all three controller files.
 $result = (new \OpenApi\Builder())
-->addSource(__DIR__)
-->build();
-header('Content-Type: application/x-yaml');
+    ->addSource(__DIR__ . '/../src/Controller/AuthController.php')
+    ->addSource(__DIR__ . '/../src/Controller/CategoryController.php')
+    ->addSource(__DIR__ . '/../src/Controller/ProductController.php')
+    ->build();
+
+// Prevent an old documentation response from being reused.
+header('Cache-Control: no-store');
+
+// Return the documentation as YAML.
+header('Content-Type: application/x-yaml; charset=utf-8');
+
 echo $result->toYaml();

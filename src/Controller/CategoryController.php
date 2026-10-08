@@ -1,16 +1,96 @@
 <?php
 
+use OpenApi\Attributes as OAT;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 require_once __DIR__ . '/../database.php';
 require_once __DIR__ . '/../validation.php';
 
+#[OAT\Schema(
+    schema: 'Category',
+    type: 'object',
+    required: ['category_id', 'active', 'name'],
+    properties: [
+        new OAT\Property(
+            property: 'category_id',
+            type: 'integer',
+            minimum: 1,
+            description: 'Interne ID der Kategorie',
+            example: 1
+        ),
+        new OAT\Property(
+            property: 'active',
+            type: 'integer',
+            enum: [0, 1],
+            description: '0 = inaktiv, 1 = aktiv',
+            example: 1
+        ),
+        new OAT\Property(
+            property: 'name',
+            type: 'string',
+            example: 'Getränke'
+        )
+    ]
+)]
+#[OAT\Schema(
+    schema: 'CategoryError',
+    type: 'object',
+    required: ['error'],
+    properties: [
+        new OAT\Property(
+            property: 'error',
+            type: 'string',
+            example: 'Category not found.'
+        )
+    ]
+)]
+#[OAT\Schema(
+    schema: 'CategoryValidationErrors',
+    type: 'object',
+    required: ['errors'],
+    properties: [
+        new OAT\Property(
+            property: 'errors',
+            type: 'array',
+            items: new OAT\Items(type: 'string'),
+            example: ['Active must be the integer 0 or 1.']
+        )
+    ]
+)]
 class CategoryController
 {
     /**
      * Return all categories.
      */
+    #[OAT\Get(
+        path: '/api/v1/categories',
+        operationId: 'listCategories',
+        tags: ['Kategorien'],
+        summary: 'Alle Kategorien abrufen',
+        description: 'Gibt alle Kategorien nach ihrer ID sortiert zurück.',
+        security: [['cookieAuth' => []]],
+        responses: [
+            new OAT\Response(
+                response: 200,
+                description: 'Liste der Kategorien. Kann leer sein.',
+                content: new OAT\JsonContent(
+                    type: 'array',
+                    items: new OAT\Items(
+                        ref: '#/components/schemas/Category'
+                    )
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            )
+        ]
+    )]
     public function listCategories(
         ServerRequestInterface $request,
         ResponseInterface $response
@@ -42,6 +122,60 @@ class CategoryController
     /**
      * Return one category by its ID.
      */
+    #[OAT\Get(
+        path: '/api/v1/category/{category_id}',
+        operationId: 'getCategory',
+        tags: ['Kategorien'],
+        summary: 'Eine Kategorie abrufen',
+        security: [['cookieAuth' => []]],
+        parameters: [
+            new OAT\Parameter(
+                name: 'category_id',
+                in: 'path',
+                required: true,
+                description: 'Interne ID der Kategorie',
+                schema: new OAT\Schema(
+                    type: 'integer',
+                    minimum: 1
+                ),
+                example: 1
+            )
+        ],
+        responses: [
+            new OAT\Response(
+                response: 200,
+                description: 'Kategorie gefunden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/Category'
+                )
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Kategorie-ID ist keine positive Ganzzahl.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError',
+                    example: [
+                        'error' => 'Category ID must be a positive integer.'
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            ),
+            new OAT\Response(
+                response: 404,
+                description: 'Kategorie wurde nicht gefunden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError'
+                )
+            )
+        ]
+    )]
     public function getCategory(
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -93,6 +227,68 @@ class CategoryController
     /**
      * Validate input and create a category.
      */
+    #[OAT\Post(
+        path: '/api/v1/category',
+        operationId: 'createCategory',
+        tags: ['Kategorien'],
+        summary: 'Eine Kategorie erstellen',
+        description: 'Erstellt eine Kategorie. Die ID wird automatisch vergeben.',
+        security: [['cookieAuth' => []]],
+        requestBody: new OAT\RequestBody(
+            required: true,
+            content: new OAT\JsonContent(
+                type: 'object',
+                required: ['active', 'name'],
+                properties: [
+                    new OAT\Property(
+                        property: 'active',
+                        type: 'integer',
+                        enum: [0, 1],
+                        example: 1
+                    ),
+                    new OAT\Property(
+                        property: 'name',
+                        type: 'string',
+                        minLength: 1,
+                        maxLength: 500,
+                        description: 'Darf nicht nur aus Leerzeichen bestehen.',
+                        example: 'Testkategorie'
+                    )
+                ]
+            )
+        ),
+        responses: [
+            new OAT\Response(
+                response: 201,
+                description: 'Kategorie wurde erstellt.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/Category'
+                )
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Ungültiger Request-Body oder ungültige Felder.',
+                content: new OAT\JsonContent(
+                    oneOf: [
+                        new OAT\Schema(
+                            ref: '#/components/schemas/CategoryError'
+                        ),
+                        new OAT\Schema(
+                            ref: '#/components/schemas/CategoryValidationErrors'
+                        )
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            )
+        ]
+    )]
     public function createCategory(
         ServerRequestInterface $request,
         ResponseInterface $response
@@ -161,6 +357,92 @@ class CategoryController
     /**
      * Update only the fields included in the request.
      */
+    #[OAT\Patch(
+        path: '/api/v1/category/{category_id}',
+        operationId: 'updateCategory',
+        tags: ['Kategorien'],
+        summary: 'Eine Kategorie teilweise ändern',
+        description: 'Ändert active, name oder beide Felder. '
+            . 'Nicht übermittelte Felder behalten ihren bisherigen Wert. '
+            . 'Unbekannte Felder werden abgelehnt.',
+        security: [['cookieAuth' => []]],
+        parameters: [
+            new OAT\Parameter(
+                name: 'category_id',
+                in: 'path',
+                required: true,
+                description: 'Interne ID der Kategorie',
+                schema: new OAT\Schema(
+                    type: 'integer',
+                    minimum: 1
+                ),
+                example: 1
+            )
+        ],
+        requestBody: new OAT\RequestBody(
+            required: true,
+            content: new OAT\JsonContent(
+                type: 'object',
+                minProperties: 1,
+                additionalProperties: false,
+                properties: [
+                    new OAT\Property(
+                        property: 'active',
+                        type: 'integer',
+                        enum: [0, 1],
+                        example: 1
+                    ),
+                    new OAT\Property(
+                        property: 'name',
+                        type: 'string',
+                        minLength: 1,
+                        maxLength: 500,
+                        description: 'Darf nicht nur aus Leerzeichen bestehen.',
+                        example: 'Testkategorie geändert'
+                    )
+                ],
+                example: ['name' => 'Testkategorie geändert']
+            )
+        ),
+        responses: [
+            new OAT\Response(
+                response: 200,
+                description: 'Kategorie wurde aktualisiert.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/Category'
+                )
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Ungültige ID, ungültiger Body oder ungültige Felder.',
+                content: new OAT\JsonContent(
+                    oneOf: [
+                        new OAT\Schema(
+                            ref: '#/components/schemas/CategoryError'
+                        ),
+                        new OAT\Schema(
+                            ref: '#/components/schemas/CategoryValidationErrors'
+                        )
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            ),
+            new OAT\Response(
+                response: 404,
+                description: 'Kategorie wurde nicht gefunden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError'
+                )
+            )
+        ]
+    )]
     public function updateCategory(
         ServerRequestInterface $request,
         ResponseInterface $response,
@@ -289,6 +571,57 @@ class CategoryController
     /**
      * Delete one category by its ID.
      */
+    #[OAT\Delete(
+        path: '/api/v1/category/{category_id}',
+        operationId: 'deleteCategory',
+        tags: ['Kategorien'],
+        summary: 'Eine Kategorie löschen',
+        security: [['cookieAuth' => []]],
+        parameters: [
+            new OAT\Parameter(
+                name: 'category_id',
+                in: 'path',
+                required: true,
+                description: 'Interne ID der Kategorie',
+                schema: new OAT\Schema(
+                    type: 'integer',
+                    minimum: 1
+                ),
+                example: 1
+            )
+        ],
+        responses: [
+            new OAT\Response(
+                response: 204,
+                description: 'Kategorie wurde gelöscht. Kein Response-Body.'
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Kategorie-ID ist keine positive Ganzzahl.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError',
+                    example: [
+                        'error' => 'Category ID must be a positive integer.'
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'JWT-Cookie fehlt, ist ungültig oder abgelaufen.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError',
+                    example: ['error' => 'Unauthorized.']
+                )
+            ),
+            new OAT\Response(
+                response: 404,
+                description: 'Kategorie wurde nicht gefunden.',
+                content: new OAT\JsonContent(
+                    ref: '#/components/schemas/CategoryError'
+                )
+            )
+        ]
+    )]
     public function deleteCategory(
         ServerRequestInterface $request,
         ResponseInterface $response,

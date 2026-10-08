@@ -1,10 +1,27 @@
 <?php
 
+use OpenApi\Attributes as OAT;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
 require_once __DIR__ . '/../authentication.php';
 
+#[OAT\Info(
+    title: 'Produkt- und Kategorien-API',
+    version: '1.0.0',
+    description: 'REST-API für die Verwaltung von Produkten und Kategorien.'
+)]
+#[OAT\Server(
+    url: '/',
+    description: 'Aktueller Server'
+)]
+#[OAT\SecurityScheme(
+    securityScheme: 'cookieAuth',
+    type: 'apiKey',
+    in: 'cookie',
+    name: 'token',
+    description: 'JWT im Cookie token. Das Cookie wird beim Login gesetzt.'
+)]
 class AuthController
 {
     private array $config;
@@ -17,6 +34,98 @@ class AuthController
     /**
      * Check login credentials and return a JWT cookie.
      */
+    #[OAT\Post(
+        path: '/api/v1/authenticate',
+        operationId: 'authenticate',
+        tags: ['Authentifizierung'],
+        summary: 'Anmelden und JWT-Cookie erhalten',
+        description: 'Prüft die Zugangsdaten, setzt das JWT-Cookie token '
+            . 'und gibt den JWT zusätzlich als JSON zurück.',
+        security: [],
+        requestBody: new OAT\RequestBody(
+            required: true,
+            description: 'Zugangsdaten für die Anmeldung',
+            content: new OAT\JsonContent(
+                type: 'object',
+                required: ['username', 'password'],
+                properties: [
+                    new OAT\Property(
+                        property: 'username',
+                        type: 'string',
+                        minLength: 1,
+                        description: 'Benutzername',
+                        example: 'demo'
+                    ),
+                    new OAT\Property(
+                        property: 'password',
+                        type: 'string',
+                        format: 'password',
+                        minLength: 1,
+                        description: 'Passwort',
+                        example: 'example-password'
+                    )
+                ]
+            )
+        ),
+        responses: [
+            new OAT\Response(
+                response: 200,
+                description: 'Anmeldung erfolgreich. Das JWT-Cookie wird gesetzt.',
+                headers: [
+                    new OAT\Header(
+                        header: 'Set-Cookie',
+                        description: 'Setzt das Cookie token mit Path=/api/v1, '
+                            . 'Max-Age, HttpOnly und SameSite=Lax. '
+                            . 'Bei HTTPS wird zusätzlich Secure gesetzt.',
+                        schema: new OAT\Schema(
+                            type: 'string'
+                        )
+                    )
+                ],
+                content: new OAT\JsonContent(
+                    type: 'object',
+                    required: ['token'],
+                    properties: [
+                        new OAT\Property(
+                            property: 'token',
+                            type: 'string',
+                            description: 'JWT für authentifizierte API-Aufrufe'
+                        )
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 400,
+                description: 'Benutzername oder Passwort fehlt oder ist ungültig.',
+                content: new OAT\JsonContent(
+                    type: 'object',
+                    required: ['error'],
+                    properties: [
+                        new OAT\Property(
+                            property: 'error',
+                            type: 'string',
+                            example: 'Username and password are required.'
+                        )
+                    ]
+                )
+            ),
+            new OAT\Response(
+                response: 401,
+                description: 'Benutzername oder Passwort ist falsch.',
+                content: new OAT\JsonContent(
+                    type: 'object',
+                    required: ['error'],
+                    properties: [
+                        new OAT\Property(
+                            property: 'error',
+                            type: 'string',
+                            example: 'Invalid username or password.'
+                        )
+                    ]
+                )
+            )
+        ]
+    )]
     public function authenticate(
         ServerRequestInterface $request,
         ResponseInterface $response
