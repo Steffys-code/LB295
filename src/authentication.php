@@ -45,7 +45,7 @@ function isValidJwt(string $token, array $config): bool
 }
 
 /**
- * Create middleware for protected routes.
+ * Create middleware for routes protected by a JWT cookie.
  */
 function createAuthMiddleware(array $config): callable
 {
@@ -53,25 +53,30 @@ function createAuthMiddleware(array $config): callable
         ServerRequestInterface $request,
         RequestHandlerInterface $handler
     ) use ($config): ResponseInterface {
-        $authorization = $request->getHeaderLine('Authorization');
+        $cookies = $request->getCookieParams();
+        $token = $cookies['token'] ?? null;
 
-        // Expected header: Authorization: Bearer TOKEN
-        if (preg_match('/^Bearer\s+(\S+)$/i', $authorization, $matches)) {
-            if (isValidJwt($matches[1], $config)) {
-                return $handler->handle($request);
-            }
+        // Grant access only when the cookie contains a valid JWT.
+        if (
+            is_string($token)
+            && $token !== ''
+            && isValidJwt($token, $config)
+        ) {
+            return $handler->handle($request);
         }
 
         // Reject missing, invalid or expired tokens.
         $response = new Response();
 
         $response->getBody()->write(
-            json_encode(['error' => 'Unauthorized.'])
+            json_encode(
+                ['error' => 'Unauthorized.'],
+                JSON_THROW_ON_ERROR
+            )
         );
 
         return $response
             ->withHeader('Content-Type', 'application/json')
-            ->withHeader('WWW-Authenticate', 'Bearer')
             ->withStatus(401);
     };
 }

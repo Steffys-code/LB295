@@ -86,23 +86,88 @@ class ProductController
     /**
      * Replace all editable product fields.
      */
-    public function updateProduct(
-        ServerRequestInterface $request,
-        ResponseInterface $response,
-        array $args
-    ): ResponseInterface {
-        $id = $args['product_id'] ?? null;
+    /**
+ * Create or update a product using the SKU from the URL.
+ */
+public function updateProduct(
+    ServerRequestInterface $request,
+    ResponseInterface $response,
+    array $args
+): ResponseInterface {
+    $sku = $args['sku'] ?? null;
 
-        if (!isValidId($id)) {
-            return $this->jsonResponse(
-                $response,
-                ['error' => 'Product ID must be a positive integer.'],
-                400
-            );
-        }
-
-        return $this->saveProduct($request, $response, (int) $id);
+    // Validate the SKU without converting it to an integer.
+    if (
+        !is_string($sku)
+        || !isValidText($sku, 100)
+    ) {
+        return $this->jsonResponse(
+            $response,
+            ['error' => 'SKU must contain between 1 and 100 characters.'],
+            400
+        );
     }
+
+    $data = $request->getParsedBody();
+
+    if (!is_array($data)) {
+        return $this->jsonResponse(
+            $response,
+            ['error' => 'A JSON object is required.'],
+            400
+        );
+    }
+
+    // Use the URL as the authoritative source of the SKU.
+    $data['sku'] = $sku;
+
+    // Validate all product data before querying the database.
+    $errors = $this->validateProduct($data);
+
+    if ($errors !== []) {
+        return $this->jsonResponse(
+            $response,
+            ['errors' => $errors],
+            400
+        );
+    }
+
+    $database = createDatabaseConnection();
+
+    try {
+        // Find the internal ID of the product with this SKU.
+        $statement = $database->prepare(
+            'SELECT product_id
+             FROM product
+             WHERE sku = ?'
+        );
+
+        $statement->bind_param('s', $sku);
+        $statement->execute();
+
+        $result = $statement->get_result();
+        $existingProduct = $result->fetch_assoc();
+
+        $result->free();
+        $statement->close();
+
+        $productId = $existingProduct === null
+            ? null
+            : (int) $existingProduct['product_id'];
+    } finally {
+        $database->close();
+    }
+
+    // Pass the SKU to the existing validation and save logic.
+    $request = $request->withParsedBody($data);
+
+    // A null ID creates a product; an existing ID updates it.
+    return $this->saveProduct(
+        $request,
+        $response,
+        $productId
+    );
+}
 
     /**
      * Delete a product.

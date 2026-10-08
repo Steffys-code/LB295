@@ -13,7 +13,7 @@ $group->get(
     [$productController, 'listProducts']
 )->add($authMiddleware);
 
-// Get one product.
+// Get one product by its internal ID.
 $group->get(
     '/product/{product_id}',
     [$productController, 'getProduct']
@@ -25,13 +25,13 @@ $group->post(
     [$productController, 'createProduct']
 )->add($authMiddleware);
 
-// Replace all editable product fields.
+// Create or update a product by its SKU.
 $group->put(
-    '/product/{product_id}',
+    '/product/{sku}',
     [$productController, 'updateProduct']
 )->add($authMiddleware);
 
-// Delete a product.
+// Delete a product by its internal ID.
 $group->delete(
     '/product/{product_id}',
     [$productController, 'deleteProduct']

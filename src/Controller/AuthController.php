@@ -15,7 +15,7 @@ class AuthController
     }
 
     /**
-     * Check login credentials and return a JWT.
+     * Check login credentials and return a JWT cookie.
      */
     public function authenticate(
         ServerRequestInterface $request,
@@ -74,6 +74,20 @@ class AuthController
 
         // Create a token after successful authentication.
         $token = createJwt($data['username'], $this->config);
+
+        // Store the JWT in a cookie for subsequent API requests.
+        $cookie = 'token=' . rawurlencode($token)
+            . '; Path=/api/v1'
+            . '; Max-Age=' . (int) $this->config['jwt']['lifetime']
+            . '; HttpOnly'
+            . '; SameSite=Lax';
+
+        // Send cookies over HTTPS only when HTTPS is used.
+        if ($request->getUri()->getScheme() === 'https') {
+            $cookie .= '; Secure';
+        }
+
+        $response = $response->withAddedHeader('Set-Cookie', $cookie);
 
         return $this->jsonResponse(
             $response,
